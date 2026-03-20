@@ -78,7 +78,7 @@ export async function executeCode(
         NetworkMode: 'none',
         ReadonlyRootfs: true,
         Memory: langConfig.memoryLimit,
-        NanoCpus: 500000000, // 0.5 CPU
+        NanoCpus: 1000000000, // 1.0 CPU
         PidsLimit: langConfig.pidsLimit,
         CapDrop: ['ALL'],
         SecurityOpt: ['no-new-privileges'],

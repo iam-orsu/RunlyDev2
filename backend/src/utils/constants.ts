@@ -5,11 +5,11 @@
 /** Maximum output size in bytes (stdout + stderr each). 64KB. */
 export const MAX_OUTPUT_BYTES = 65536;
 
-/** Maximum execution time for user code in milliseconds. 10 seconds. */
-export const EXECUTION_TIMEOUT_MS = 10000;
+/** Maximum execution time for user code in milliseconds. 30 seconds (compiled langs need time). */
+export const EXECUTION_TIMEOUT_MS = 30000;
 
-/** Total job timeout including compile + run + overhead. 30 seconds. */
-export const JOB_TIMEOUT_MS = 30000;
+/** Total job timeout including compile + run + overhead. 45 seconds. */
+export const JOB_TIMEOUT_MS = 45000;
 
 /** BullMQ queue name — used by producer and worker. */
 export const QUEUE_NAME = 'code-execution';
