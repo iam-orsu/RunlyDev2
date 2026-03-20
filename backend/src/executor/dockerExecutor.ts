@@ -22,6 +22,12 @@ export interface ExecutionResult {
   timedOut: boolean;
 }
 
+// ─── File entry from frontend ─────────────────────────────────
+export interface FileEntry {
+  name: string;
+  content: string;
+}
+
 // ─── Output truncation ───────────────────────────────────────
 function truncateOutput(s: string): string {
   if (Buffer.byteLength(s) <= MAX_OUTPUT_BYTES) return s;
@@ -47,19 +53,30 @@ export async function executeCode(
   submissionId: string,
   languageId: LanguageId,
   sourceCode: string,
-  stdin: string
+  stdin: string,
+  files?: FileEntry[],
+  entryFile?: string
 ): Promise<ExecutionResult> {
   const langConfig = LANGUAGES[languageId];
-  const filename = getFilename(languageId);
+  const filename = entryFile || getFilename(languageId);
 
   // Create temp dir in the shared volume (mounted at same path on worker + host)
-  // This ensures the Docker daemon can find the files when bind-mounting into sandbox
   const randomSuffix = crypto.randomBytes(4).toString('hex');
   const hostCodeDir = `/tmp/runly-code/runly-${submissionId}-${randomSuffix}`;
   await fs.mkdir(hostCodeDir, { recursive: true });
 
-  // Write source code file
-  await fs.writeFile(path.join(hostCodeDir, filename), sourceCode, 'utf8');
+  // Write files — either multi-file or single source_code
+  if (files && files.length > 0) {
+    for (const file of files) {
+      const filePath = path.join(hostCodeDir, file.name);
+      const dir = path.dirname(filePath);
+      await fs.mkdir(dir, { recursive: true });
+      await fs.writeFile(filePath, file.content, 'utf8');
+    }
+  } else {
+    // Fallback: single file mode (backward compatible)
+    await fs.writeFile(path.join(hostCodeDir, filename), sourceCode, 'utf8');
+  }
 
   // Always write stdin.txt (empty if no stdin)
   await fs.writeFile(path.join(hostCodeDir, 'stdin.txt'), stdin || '', 'utf8');
@@ -152,6 +169,7 @@ export async function executeCode(
         timedOut,
         stdoutLen: result.stdout.length,
         stderrLen: result.stderr.length,
+        fileCount: files?.length || 1,
       },
       'Execution completed'
     );
@@ -165,7 +183,6 @@ export async function executeCode(
       'Execution failed with error'
     );
 
-    // If timeout was set but we errored before wait() resolved, clear it
     if (timeoutHandle) clearTimeout(timeoutHandle);
 
     return {
@@ -181,7 +198,7 @@ export async function executeCode(
       try {
         await container.remove({ force: true });
       } catch {
-        // Container may have been auto-removed or already gone
+        // Container may have been auto-removed
       }
     }
 

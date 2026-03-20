@@ -61,12 +61,17 @@ async function processJob(job: Job<ExecutionJobData>): Promise<void> {
   // Mark as running
   await updateSubmission(submissionId, { status: STATUS.RUNNING });
 
+  // Extract multi-file data from job
+  const { files, entryFile } = job.data;
+
   // Execute code in sandbox container
   const result: ExecutionResult = await executeCode(
     submissionId,
     submission.language as LanguageId,
     submission.source_code,
-    submission.stdin
+    submission.stdin,
+    files,
+    entryFile
   );
 
   // Determine status

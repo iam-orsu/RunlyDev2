@@ -10,10 +10,17 @@ import { logger } from '../utils/logger';
 const router = Router();
 
 // ─── Validation schema ───────────────────────────────────────
+const fileSchema = z.object({
+  name: z.string().min(1).max(255),
+  content: z.string().max(MAX_SOURCE_CODE_LENGTH),
+});
+
 const submitSchema = z.object({
   language: z.enum(LANGUAGE_IDS),
   source_code: z.string().min(1).max(MAX_SOURCE_CODE_LENGTH),
   stdin: z.string().max(MAX_STDIN_LENGTH).default(''),
+  files: z.array(fileSchema).optional(),
+  entry_file: z.string().optional(),
 });
 
 // ─── POST /api/submissions ────────────────────────────────────
@@ -32,20 +39,20 @@ router.post('/', async (req: Request, res: Response) => {
       return;
     }
 
-    const { language, source_code, stdin } = parsed.data;
+    const { language, source_code, stdin, files, entry_file } = parsed.data;
 
-    // Create submission in DB
+    // Create submission in DB (source_code stores the entry file content for backward compat)
     const submission = await createSubmission({
       language,
       source_code,
       stdin,
     });
 
-    // Enqueue for execution
-    await enqueueExecution(submission.id);
+    // Enqueue for execution — pass files in job data
+    await enqueueExecution(submission.id, files, entry_file);
 
     logger.info(
-      { submissionId: submission.id, language },
+      { submissionId: submission.id, language, fileCount: files?.length || 1 },
       'Submission created and enqueued'
     );
 

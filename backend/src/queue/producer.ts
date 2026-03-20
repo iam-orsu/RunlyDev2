@@ -4,7 +4,6 @@ import { QUEUE_NAME } from '../utils/constants';
 import { logger } from '../utils/logger';
 
 // ─── Queue instance ───────────────────────────────────────────
-// Pass Redis URL as connection string — BullMQ creates its own ioredis internally
 export const executionQueue = new Queue(QUEUE_NAME, {
   connection: {
     host: new URL(config.redisUrl).hostname,
@@ -14,13 +13,24 @@ export const executionQueue = new Queue(QUEUE_NAME, {
 });
 
 // ─── Job interface ────────────────────────────────────────────
+export interface FileEntry {
+  name: string;
+  content: string;
+}
+
 export interface ExecutionJobData {
   submissionId: string;
+  files?: FileEntry[];
+  entryFile?: string;
 }
 
 // ─── Enqueue function ─────────────────────────────────────────
-export async function enqueueExecution(submissionId: string): Promise<void> {
-  const jobData: ExecutionJobData = { submissionId };
+export async function enqueueExecution(
+  submissionId: string,
+  files?: FileEntry[],
+  entryFile?: string
+): Promise<void> {
+  const jobData: ExecutionJobData = { submissionId, files, entryFile };
 
   await executionQueue.add('execute', jobData, {
     attempts: 1,
@@ -28,5 +38,5 @@ export async function enqueueExecution(submissionId: string): Promise<void> {
     removeOnFail: { age: 300 },
   });
 
-  logger.info({ submissionId, queue: QUEUE_NAME }, 'Job enqueued');
+  logger.info({ submissionId, queue: QUEUE_NAME, fileCount: files?.length || 0 }, 'Job enqueued');
 }
