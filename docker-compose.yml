@@ -9,8 +9,10 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
-      - api
-      - frontend
+      api:
+        condition: service_started
+      frontend:
+        condition: service_started
     restart: unless-stopped
     networks:
       - runly-net
@@ -88,7 +90,6 @@ services:
       - NODE_ENV=${NODE_ENV:-development}
       - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - REDIS_URL=redis://redis:6379
-      - DOCKER_BUILDKIT=0
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     # Placeholder command until src/ files are added
@@ -137,6 +138,15 @@ services:
     restart: unless-stopped
     networks:
       - runly-net
+
+  # ─── Sandbox Image Builder (builds runly-sandbox image) ──────
+  sandbox-builder:
+    build:
+      context: ./sandbox
+      dockerfile: Dockerfile.sandbox
+    image: runly-sandbox
+    entrypoint: ["true"]
+    restart: "no"
 
 volumes:
   pgdata:
