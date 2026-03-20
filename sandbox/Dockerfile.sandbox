@@ -1,2 +1,101 @@
+# ─────────────────────────────────────────────────────────────────
+# Runly.dev Multi-Language Sandbox Image
+# Contains: Python 3.12, Node.js 20, GCC/G++ 14, OpenJDK 21,
+#           Go 1.22, Rust 1.77, PHP 8.3, Ruby 3.3
+# ─────────────────────────────────────────────────────────────────
 FROM ubuntu:22.04
-RUN echo "sandbox placeholder"
+
+# Prevent interactive prompts during install
+ENV DEBIAN_FRONTEND=noninteractive
+
+# ─── 1. System dependencies ────────────────────────────────────
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    wget \
+    gnupg2 \
+    software-properties-common \
+    ca-certificates \
+    apt-transport-https \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# ─── 2. Python 3.12 via deadsnakes PPA ─────────────────────────
+RUN add-apt-repository ppa:deadsnakes/ppa \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+       python3.12 \
+       python3.12-distutils \
+    && ln -sf /usr/bin/python3.12 /usr/bin/python3 \
+    && rm -rf /var/lib/apt/lists/*
+
+# ─── 3. Node.js 20 via nodesource ──────────────────────────────
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# ─── 4. GCC/G++ 14 ─────────────────────────────────────────────
+RUN add-apt-repository ppa:ubuntu-toolchain-r/test \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends gcc-14 g++-14 \
+    && ln -sf /usr/bin/gcc-14 /usr/bin/gcc \
+    && ln -sf /usr/bin/g++-14 /usr/bin/g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# ─── 5. OpenJDK 21 ─────────────────────────────────────────────
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openjdk-21-jdk \
+    && rm -rf /var/lib/apt/lists/*
+
+# ─── 6. Go 1.22 via official tarball ───────────────────────────
+RUN wget -q https://go.dev/dl/go1.22.0.linux-amd64.tar.gz \
+    && tar -C /usr/local -xzf go1.22.0.linux-amd64.tar.gz \
+    && rm go1.22.0.linux-amd64.tar.gz \
+    && ln -sf /usr/local/go/bin/go /usr/bin/go
+
+# ─── 7. Rust 1.77 via rustup ───────────────────────────────────
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+    | sh -s -- -y --default-toolchain 1.77.0 --no-modify-path \
+    && cp /root/.cargo/bin/rustc /usr/local/bin/rustc \
+    && cp /root/.cargo/bin/cargo /usr/local/bin/cargo
+
+# ─── 8. PHP 8.3 via ondrej PPA ─────────────────────────────────
+RUN add-apt-repository ppa:ondrej/php \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends php8.3-cli \
+    && ln -sf /usr/bin/php8.3 /usr/bin/php \
+    && rm -rf /var/lib/apt/lists/*
+
+# ─── 9. Ruby 3.3 via brightbox PPA ─────────────────────────────
+RUN add-apt-repository ppa:brightbox/ruby-ng \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends ruby3.3 \
+    && ln -sf /usr/bin/ruby3.3 /usr/bin/ruby \
+    && rm -rf /var/lib/apt/lists/*
+
+# ─── Final cleanup ─────────────────────────────────────────────
+RUN apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /root/.cargo
+
+# ─── Environment variables ─────────────────────────────────────
+# Go: writable build cache in /tmp (container runs with tmpfs /tmp)
+ENV GOPATH=/tmp/go
+ENV GOCACHE=/tmp/.cache
+ENV GOFLAGS=-mod=mod
+
+# Rust: set homes (binaries already copied to /usr/local/bin)
+ENV RUSTUP_HOME=/usr/local/rustup
+ENV CARGO_HOME=/usr/local/cargo
+
+# PATH: ensure Go and Cargo bins are findable
+ENV PATH=/usr/local/cargo/bin:/usr/local/go/bin:$PATH
+
+# ─── Non-root user ─────────────────────────────────────────────
+RUN useradd -m -u 1000 -s /bin/bash sandbox
+
+# ─── Entrypoint ────────────────────────────────────────────────
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+WORKDIR /sandbox
+USER sandbox
+ENTRYPOINT ["/entrypoint.sh"]
