@@ -1,0 +1,83 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --runly-bg: #0e1117;
+    --runly-panel: #161b22;
+    --runly-border: #30363d;
+    --runly-accent: #58a6ff;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #30363d #0e1117;
+  }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: #0e1117;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: #30363d;
+    border-radius: 4px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: #484f58;
+  }
+
+  body {
+    @apply bg-runly-bg text-runly-text font-sans;
+    overflow: hidden;
+  }
+}
+
+@layer components {
+  .status-badge {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center gap-2 px-4 py-2 bg-runly-accent text-white font-medium rounded-lg
+           hover:bg-blue-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed
+           focus:outline-none focus:ring-2 focus:ring-runly-accent/50 active:scale-[0.97];
+  }
+
+  .panel {
+    @apply bg-runly-panel border border-runly-border rounded-lg;
+  }
+}
+
+/* Allotment split pane styling */
+.allotment-module_splitView__MGZ6O {
+  background: #0e1117 !important;
+}
+
+.allotment-module_sash__sv6xH {
+  background: #30363d !important;
+  transition: background 0.2s;
+}
+
+.allotment-module_sash__sv6xH:hover,
+.allotment-module_sash__sv6xH.allotment-module_active__lJhjl {
+  background: #58a6ff !important;
+}
+
+/* Pulse animation for loading */
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 1.5s ease-in-out infinite;
+}

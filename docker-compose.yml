@@ -28,15 +28,7 @@ services:
     environment:
       - NODE_ENV=${NODE_ENV:-development}
       - NEXT_TELEMETRY_DISABLED=1
-    # Placeholder command until src/ files are added
-    command: >
-      node -e "
-        const http = require('http');
-        http.createServer((req, res) => {
-          res.writeHead(200, {'Content-Type':'text/html'});
-          res.end('<h1>Runly.dev — Frontend placeholder</h1>');
-        }).listen(3000, () => console.log('Frontend placeholder on :3000'));
-      "
+    command: ["npm", "run", "dev"]
     restart: unless-stopped
     networks:
       - runly-net
