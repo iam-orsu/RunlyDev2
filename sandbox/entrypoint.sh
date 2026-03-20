@@ -1,5 +1,5 @@
 #!/bin/bash
-set -eo pipefail
+set -o pipefail
 
 # ─────────────────────────────────────────────────────────────────
 # Runly.dev Sandbox Entrypoint
@@ -28,17 +28,15 @@ MAX_OUTPUT=65536
 # stderr and meta.json, then exits with code 1.
 compile() {
   local compile_cmd=$1
+  local exit_code
   eval "$compile_cmd" 2>/tmp/compile.err
-  local exit_code=$?
+  exit_code=$?
   if [ $exit_code -ne 0 ]; then
     cat /tmp/compile.err >&2
     echo "{\"exit_code\": 1, \"timed_out\": false, \"status\": \"compile_error\"}" > /tmp/meta.json
     exit 1
   fi
-  # Prevent exit code 126 — ensure binary is executable
-  if [ -f /tmp/main ]; then
-    chmod +x /tmp/main
-  fi
+  [ -f /tmp/main ] && chmod +x /tmp/main
 }
 
 # ─── Run function ──────────────────────────────────────────────
@@ -83,7 +81,9 @@ case $LANGUAGE in
     # Go needs writable dirs for build cache — copy source to /tmp
     mkdir -p /tmp/go-build
     cp /code/main.go /tmp/go-build/main.go
-    compile "cd /tmp/go-build && go build -o /tmp/main /tmp/go-build/main.go"
+    echo 'module sandbox
+go 1.22' > /tmp/go-build/go.mod
+    compile "cd /tmp/go-build && go build -o /tmp/main ."
     run_code "/tmp/main"
     ;;
 
