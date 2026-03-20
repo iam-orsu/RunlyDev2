@@ -1,0 +1,147 @@
+version: "3.8"
+
+services:
+  # ─── Reverse Proxy ────────────────────────────────────────────
+  nginx:
+    image: nginx:1.25-alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api
+      - frontend
+    restart: unless-stopped
+    networks:
+      - runly-net
+
+  # ─── Next.js Frontend ────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: runly-frontend
+    expose:
+      - "3000"
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - NEXT_TELEMETRY_DISABLED=1
+    # Placeholder command until src/ files are added
+    command: >
+      node -e "
+        const http = require('http');
+        http.createServer((req, res) => {
+          res.writeHead(200, {'Content-Type':'text/html'});
+          res.end('<h1>Runly.dev — Frontend placeholder</h1>');
+        }).listen(3000, () => console.log('Frontend placeholder on :3000'));
+      "
+    restart: unless-stopped
+    networks:
+      - runly-net
+
+  # ─── Express API Server ──────────────────────────────────────
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: runly-backend
+    expose:
+      - "4000"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - PORT=4000
+      - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # Placeholder command until src/ files are added
+    command: >
+      node -e "
+        const http = require('http');
+        http.createServer((req, res) => {
+          res.writeHead(200, {'Content-Type':'application/json'});
+          res.end(JSON.stringify({ status: 'ok', service: 'api' }));
+        }).listen(4000, () => console.log('API placeholder on :4000'));
+      "
+    restart: unless-stopped
+    networks:
+      - runly-net
+
+  # ─── BullMQ Worker (same image as API, different CMD) ────────
+  worker:
+    image: runly-backend
+    depends_on:
+      api:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://redis:6379
+      - DOCKER_BUILDKIT=0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    # Placeholder command until src/ files are added
+    command: >
+      node -e "
+        console.log('Worker placeholder running');
+        console.log('Docker socket mounted: /var/run/docker.sock');
+        setInterval(() => { console.log('Worker heartbeat'); }, 30000);
+      "
+    restart: unless-stopped
+    networks:
+      - runly-net
+
+  # ─── Redis (BullMQ queue backend) ────────────────────────────
+  redis:
+    image: redis:7-alpine
+    expose:
+      - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - runly-net
+
+  # ─── PostgreSQL (submissions database) ───────────────────────
+  postgres:
+    image: postgres:16-alpine
+    expose:
+      - "5432"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - runly-net
+
+volumes:
+  pgdata:
+    driver: local
+
+networks:
+  runly-net:
+    driver: bridge

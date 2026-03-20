@@ -1,0 +1,41 @@
+{
+  "name": "runly-backend",
+  "version": "1.0.0",
+  "description": "Runly.dev — API server and execution worker",
+  "private": true,
+  "scripts": {
+    "dev": "nodemon --exec ts-node src/index.ts",
+    "dev:worker": "nodemon --exec ts-node src/queue/worker.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "start:worker": "node dist/queue/worker.js",
+    "migrate": "knex migrate:latest --knexfile src/db/knex.ts",
+    "migrate:rollback": "knex migrate:rollback --knexfile src/db/knex.ts"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "bullmq": "^5.34.0",
+    "ioredis": "^5.4.0",
+    "dockerode": "^4.0.0",
+    "knex": "^3.1.0",
+    "pg": "^8.13.0",
+    "express-rate-limit": "^7.4.0",
+    "cors": "^2.8.5",
+    "helmet": "^8.0.0",
+    "pino": "^9.5.0",
+    "pino-pretty": "^13.0.0",
+    "uuid": "^11.0.0",
+    "dotenv": "^16.4.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "ts-node": "^10.9.0",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "@types/cors": "^2.8.0",
+    "@types/uuid": "^10.0.0",
+    "@types/dockerode": "^3.3.0",
+    "nodemon": "^3.1.0"
+  }
+}
