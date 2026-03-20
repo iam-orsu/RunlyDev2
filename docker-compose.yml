@@ -61,15 +61,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    # Placeholder command until src/ files are added
-    command: >
-      node -e "
-        const http = require('http');
-        http.createServer((req, res) => {
-          res.writeHead(200, {'Content-Type':'application/json'});
-          res.end(JSON.stringify({ status: 'ok', service: 'api' }));
-        }).listen(4000, () => console.log('API placeholder on :4000'));
-      "
+    command: ["npx", "ts-node", "src/index.ts"]
     restart: unless-stopped
     networks:
       - runly-net
@@ -92,13 +84,8 @@ services:
       - REDIS_URL=redis://redis:6379
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    # Placeholder command until src/ files are added
-    command: >
-      node -e "
-        console.log('Worker placeholder running');
-        console.log('Docker socket mounted: /var/run/docker.sock');
-        setInterval(() => { console.log('Worker heartbeat'); }, 30000);
-      "
+      - /tmp/runly-code:/tmp/runly-code
+    command: ["npx", "ts-node", "src/workerMain.ts"]
     restart: unless-stopped
     networks:
       - runly-net
