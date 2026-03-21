@@ -1,9 +1,12 @@
-// ─── Language IDs — must match backend exactly ────────────────
+// ─── Language IDs ─────────────────────────────────────────────
 export const LANGUAGE_IDS = [
   'python', 'node', 'c', 'cpp', 'java', 'go', 'rust', 'php', 'ruby',
+  'html', 'react', 'vue', 'angular',
 ] as const;
 
 export type LanguageId = typeof LANGUAGE_IDS[number];
+
+export const WEB_LANGUAGE_IDS: LanguageId[] = ['html', 'react', 'vue', 'angular'];
 
 // ─── Language display config ──────────────────────────────────
 export interface LanguageOption {
@@ -14,6 +17,8 @@ export interface LanguageOption {
   extension: string;
   defaultFilename: string;
   defaultCode: string;
+  isWebMode?: boolean;
+  defaultFiles?: { name: string; content: string }[];
 }
 
 export const LANGUAGES: LanguageOption[] = [
@@ -121,6 +126,94 @@ echo "Hello From Instacks\\n";`,
     defaultFilename: 'main.rb',
     defaultCode: 'puts "Hello From Instacks"',
   },
+  {
+    id: 'html',
+    name: 'HTML/CSS/JS',
+    monacoId: 'html',
+    icon: '🌐',
+    extension: '.html',
+    defaultFilename: 'index.html',
+    isWebMode: true,
+    defaultCode: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Runly.dev</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <h1>Hello, World!</h1>
+  <p>Edit the files on the left to get started.</p>
+  <script src="script.js"></script>
+</body>
+</html>`,
+    defaultFiles: [
+      {
+        name: 'styles.css',
+        content: `body {\n  font-family: sans-serif;\n  max-width: 800px;\n  margin: 40px auto;\n  padding: 0 20px;\n  background: #f5f5f5;\n}\nh1 { color: #333; }`,
+      },
+      {
+        name: 'script.js',
+        content: `console.log('Hello from script.js!');`,
+      },
+    ],
+  },
+  {
+    id: 'react',
+    name: 'React 18',
+    monacoId: 'javascript',
+    icon: '⚛️',
+    extension: '.jsx',
+    defaultFilename: 'App.jsx',
+    isWebMode: true,
+    defaultCode: `function App() {
+  const [count, setCount] = React.useState(0);
+
+  return (
+    <div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
+      <h1>Hello from React!</h1>
+      <p>Count: {count}</p>
+      <button onClick={() => setCount(count + 1)}>
+        Click me
+      </button>
+    </div>
+  );
+}`,
+  },
+  {
+    id: 'vue',
+    name: 'Vue 3',
+    monacoId: 'javascript',
+    icon: '💚',
+    extension: '.vue',
+    defaultFilename: 'App.vue',
+    isWebMode: true,
+    defaultCode: `const App = {
+  data() {
+    return { count: 0, message: 'Hello from Vue!' }
+  },
+  template: \`
+    <div style="padding: 20px; font-family: sans-serif;">
+      <h1>{{ message }}</h1>
+      <p>Count: {{ count }}</p>
+      <button @click="count++">Click me</button>
+    </div>
+  \`
+}`,
+  },
+  {
+    id: 'angular',
+    name: 'AngularJS 1.x',
+    monacoId: 'typescript',
+    icon: '🅰️',
+    extension: '.ts',
+    defaultFilename: 'app.component.ts',
+    isWebMode: true,
+    defaultCode: `$scope.message = 'Hello from Angular!';
+$scope.count = 0;
+$scope.increment = function() { $scope.count++; };`,
+  },
 ];
 
 // ─── File Explorer types ──────────────────────────────────────
@@ -188,6 +281,10 @@ export function isTerminalStatus(status: SubmissionStatus): boolean {
 
 export function getLanguageById(id: LanguageId): LanguageOption {
   return LANGUAGES.find((l) => l.id === id)!;
+}
+
+export function isWebLanguage(id: LanguageId): boolean {
+  return WEB_LANGUAGE_IDS.includes(id);
 }
 
 // ─── Input prompt extraction per language ─────────────────────

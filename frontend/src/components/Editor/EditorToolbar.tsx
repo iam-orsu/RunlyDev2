@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Play, Loader2, ChevronDown, AlertTriangle } from 'lucide-react';
+import { Play, Loader2, ChevronDown, AlertTriangle, RefreshCw } from 'lucide-react';
 import { LanguageOption, LANGUAGES, LanguageId } from '@/types';
 
 interface EditorToolbarProps {
@@ -10,9 +10,11 @@ interface EditorToolbarProps {
   onRun: () => void;
   isRunning: boolean;
   activeFileName: string;
+  isWebMode?: boolean;
+  onRefresh?: () => void;
 }
 
-export default function EditorToolbar({ language, onLanguageChange, onRun, isRunning, activeFileName }: EditorToolbarProps) {
+export default function EditorToolbar({ language, onLanguageChange, onRun, isRunning, activeFileName, isWebMode, onRefresh }: EditorToolbarProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showSwitchModal, setShowSwitchModal] = useState(false);
   const [pendingLanguage, setPendingLanguage] = useState<LanguageId | null>(null);
@@ -94,16 +96,27 @@ export default function EditorToolbar({ language, onLanguageChange, onRun, isRun
           </span>
         </div>
 
-        {/* Right: Run */}
+        {/* Right: Run or Refresh */}
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-runly-muted hidden sm:block">Ctrl+Enter</span>
-          <button onClick={onRun} disabled={isRunning} className="btn-primary text-xs py-1.5 px-3">
-            {isRunning ? (
-              <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Running...</>
-            ) : (
-              <><Play className="w-3.5 h-3.5" /> Run</>
-            )}
-          </button>
+          {isWebMode ? (
+            <button
+              onClick={() => onRefresh?.()}
+              className="btn-primary text-xs py-1.5 px-3"
+            >
+              <RefreshCw className="w-3.5 h-3.5" /> Refresh
+            </button>
+          ) : (
+            <>
+              <span className="text-[10px] text-runly-muted hidden sm:block">Ctrl+Enter</span>
+              <button onClick={onRun} disabled={isRunning} className="btn-primary text-xs py-1.5 px-3">
+                {isRunning ? (
+                  <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Running...</>
+                ) : (
+                  <><Play className="w-3.5 h-3.5" /> Run</>
+                )}
+              </button>
+            </>
+          )}
         </div>
       </div>
 

@@ -8,11 +8,15 @@ import { Code2, Github } from 'lucide-react';
 import {
   LanguageId, LanguageOption, LANGUAGES, FileNode, Submission,
   isTerminalStatus, getLanguageById, extractInputPrompts, generateFileId,
+  isWebLanguage,
 } from '@/types';
 import { submitCode, getSubmission } from '@/lib/api';
 import FileExplorer from '@/components/Explorer/FileExplorer';
 import EditorToolbar from '@/components/Editor/EditorToolbar';
 import ConsolePanel from '@/components/Console/ConsolePanel';
+import PreviewPanel from '@/components/Preview/PreviewPanel';
+import WebConsolePanel from '@/components/Preview/WebConsolePanel';
+import type { WebConsoleMessage } from '@/components/Preview/PreviewPanel';
 
 const CodeEditor = dynamic(() => import('@/components/Editor/CodeEditor'), {
   ssr: false,
@@ -28,13 +32,27 @@ const POLL_INTERVAL_MS = 1000;
 
 // ─── Helper: create default workspace for a language ──────────
 function createDefaultWorkspace(lang: LanguageOption): FileNode[] {
-  return [{
+  const mainFile: FileNode = {
     id: generateFileId(),
     name: lang.defaultFilename,
     type: 'file',
     content: lang.defaultCode,
     parentId: null,
-  }];
+  };
+
+  // Web modes with multiple default files (e.g. HTML mode)
+  if (lang.defaultFiles && lang.defaultFiles.length > 0) {
+    const extraFiles: FileNode[] = lang.defaultFiles.map(f => ({
+      id: generateFileId(),
+      name: f.name,
+      type: 'file' as const,
+      content: f.content,
+      parentId: null,
+    }));
+    return [mainFile, ...extraFiles];
+  }
+
+  return [mainFile];
 }
 
 // ─── Helper: find a node by id in the tree ────────────────────
@@ -73,6 +91,18 @@ function collectAllFiles(nodes: FileNode[], prefix = ''): { name: string; conten
   return result;
 }
 
+// ─── Helper: flatten file tree into flat FileNode array ───────
+function flattenFiles(nodes: FileNode[]): FileNode[] {
+  const result: FileNode[] = [];
+  for (const n of nodes) {
+    if (n.type === 'file') result.push(n);
+    if (n.type === 'folder' && n.children) {
+      result.push(...flattenFiles(n.children));
+    }
+  }
+  return result;
+}
+
 export default function HomePage() {
   const [language, setLanguage] = useState<LanguageOption>(LANGUAGES[0]);
   const [files, setFiles] = useState<FileNode[]>(() => createDefaultWorkspace(LANGUAGES[0]));
@@ -84,6 +114,12 @@ export default function HomePage() {
   const [inputPrompts, setInputPrompts] = useState<string[]>([]);
   const [collectedInputs, setCollectedInputs] = useState<string[]>([]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Web mode state
+  const [webConsoleMessages, setWebConsoleMessages] = useState<WebConsoleMessage[]>([]);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const isWebMode = isWebLanguage(language.id);
 
   // Set initial active file
   useEffect(() => {
@@ -123,12 +159,15 @@ export default function HomePage() {
     setActiveFileId(workspace[0].id);
     setSubmission(null);
     setError(null);
+    setWebConsoleMessages([]);
+    setRefreshKey(0);
   }, []);
 
-  // Execute code
+  // Execute code (backend languages only)
   const executeSubmission = useCallback(async (stdin: string) => {
     if (isRunning) return;
     if (!activeFile) return;
+    if (isWebMode) return; // Never call API for web modes
 
     setIsRunning(true);
     setError(null);
@@ -170,11 +209,11 @@ export default function HomePage() {
       setIsRunning(false);
       setError(submitError instanceof Error ? submitError.message : 'Failed to submit code');
     }
-  }, [isRunning, activeFile, files, language.id]);
+  }, [isRunning, activeFile, files, language.id, isWebMode]);
 
-  // Handle Run click — check for inputs first
+  // Handle Run click — check for inputs first (backend only)
   const handleRun = useCallback(() => {
-    if (isRunning) return;
+    if (isRunning || isWebMode) return;
     const code = activeFile?.content || '';
     const prompts = extractInputPrompts(code, language.id);
 
@@ -189,7 +228,7 @@ export default function HomePage() {
       setInputPrompts([]);
       executeSubmission('');
     }
-  }, [isRunning, activeFile, language.id, executeSubmission]);
+  }, [isRunning, isWebMode, activeFile, language.id, executeSubmission]);
 
   // Handle inputs collected from console
   const handleInputsCollected = useCallback((inputs: string[]) => {
@@ -197,6 +236,22 @@ export default function HomePage() {
     setCollectedInputs(inputs);
     executeSubmission(inputs.join('\n'));
   }, [executeSubmission]);
+
+  // Web mode: handle console messages from iframe
+  const handleWebConsoleMessage = useCallback((msg: WebConsoleMessage) => {
+    setWebConsoleMessages(prev => [...prev, msg]);
+  }, []);
+
+  // Web mode: refresh preview
+  const handleRefreshPreview = useCallback(() => {
+    setWebConsoleMessages([]);
+    setRefreshKey(prev => prev + 1);
+  }, []);
+
+  // Web mode: clear console
+  const handleClearWebConsole = useCallback(() => {
+    setWebConsoleMessages([]);
+  }, []);
 
   return (
     <div className="h-screen flex flex-col bg-runly-bg">
@@ -210,7 +265,7 @@ export default function HomePage() {
             Runly<span className="text-runly-accent">.dev</span>
           </h1>
           <span className="text-[10px] text-runly-muted hidden sm:block ml-1">
-            Run code in 9 languages instantly
+            Run code in 13 languages instantly
           </span>
         </div>
 
@@ -244,6 +299,8 @@ export default function HomePage() {
                 onRun={handleRun}
                 isRunning={isRunning || isCollectingInputs}
                 activeFileName={activeFile?.name || ''}
+                isWebMode={isWebMode}
+                onRefresh={handleRefreshPreview}
               />
               <div className="flex-1">
                 <CodeEditor
@@ -256,17 +313,40 @@ export default function HomePage() {
             </div>
           </Allotment.Pane>
 
-          {/* Column 3: Console */}
+          {/* Column 3: Console (backend) or Preview + WebConsole (web modes) */}
           <Allotment.Pane minSize={250} preferredSize={320}>
-            <ConsolePanel
-              submission={submission}
-              isRunning={isRunning}
-              error={error}
-              prompts={inputPrompts}
-              collectedInputs={collectedInputs}
-              onInputsCollected={handleInputsCollected}
-              isCollectingInputs={isCollectingInputs}
-            />
+            {isWebMode ? (
+              <Allotment vertical>
+                {/* Top 70%: Preview */}
+                <Allotment.Pane preferredSize="70%">
+                  <PreviewPanel
+                    files={flattenFiles(files)}
+                    activeCode={activeCode}
+                    languageId={language.id}
+                    onConsoleMessage={handleWebConsoleMessage}
+                    onRefresh={handleRefreshPreview}
+                    refreshKey={refreshKey}
+                  />
+                </Allotment.Pane>
+                {/* Bottom 30%: Web Console */}
+                <Allotment.Pane preferredSize="30%">
+                  <WebConsolePanel
+                    messages={webConsoleMessages}
+                    onClear={handleClearWebConsole}
+                  />
+                </Allotment.Pane>
+              </Allotment>
+            ) : (
+              <ConsolePanel
+                submission={submission}
+                isRunning={isRunning}
+                error={error}
+                prompts={inputPrompts}
+                collectedInputs={collectedInputs}
+                onInputsCollected={handleInputsCollected}
+                isCollectingInputs={isCollectingInputs}
+              />
+            )}
           </Allotment.Pane>
         </Allotment>
       </div>
