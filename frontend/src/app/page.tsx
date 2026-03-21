@@ -118,6 +118,7 @@ export default function HomePage() {
   // Web mode state
   const [webConsoleMessages, setWebConsoleMessages] = useState<WebConsoleMessage[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [selectedLibraries, setSelectedLibraries] = useState<string[]>([]);
 
   const isWebMode = isWebLanguage(language.id);
 
@@ -161,6 +162,7 @@ export default function HomePage() {
     setError(null);
     setWebConsoleMessages([]);
     setRefreshKey(0);
+    setSelectedLibraries([]);
   }, []);
 
   // Execute code (backend languages only)
@@ -301,6 +303,8 @@ export default function HomePage() {
                 activeFileName={activeFile?.name || ''}
                 isWebMode={isWebMode}
                 onRefresh={handleRefreshPreview}
+                selectedLibraries={selectedLibraries}
+                onLibraryChange={setSelectedLibraries}
               />
               <div className="flex-1">
                 <CodeEditor
@@ -326,6 +330,7 @@ export default function HomePage() {
                     onConsoleMessage={handleWebConsoleMessage}
                     onRefresh={handleRefreshPreview}
                     refreshKey={refreshKey}
+                    selectedLibraries={selectedLibraries}
                   />
                 </Allotment.Pane>
                 {/* Bottom 30%: Web Console */}

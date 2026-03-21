@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { RefreshCw, ExternalLink, Eye } from 'lucide-react';
 import { FileNode, LanguageId } from '@/types';
+import { buildLibraryInjections, FOUC_FIX, needsFoucFix } from '@/lib/marketplace';
 
 // ─── Console interceptor injected BEFORE any user code ────────
 const CONSOLE_INTERCEPTOR = `<script>
@@ -52,7 +53,7 @@ const CONSOLE_INTERCEPTOR = `<script>
 
 // ─── Document builders per web mode ───────────────────────────
 
-function buildHtmlDocument(files: FileNode[]): string {
+function buildHtmlDocument(files: FileNode[], selectedLibraries: string[]): string {
   const htmlFile = files.find(f => f.name === 'index.html');
   const cssFiles = files.filter(f => f.name.endsWith('.css'));
   const jsFiles = files.filter(f => f.name.endsWith('.js') && f.name !== 'index.html');
@@ -74,11 +75,13 @@ function buildHtmlDocument(files: FileNode[]): string {
     .map(f => `<script>/* ${f.name} */\n${f.content || ''}\n</script>`)
     .join('\n');
 
-  // Insert console interceptor + styles into <head>
+  // Insert marketplace libraries + console interceptor + styles into <head>
+  const libBlock = buildLibraryInjections(selectedLibraries);
+  const foucFix = needsFoucFix(selectedLibraries) ? FOUC_FIX : '';
   if (html.includes('<head>')) {
-    html = html.replace('<head>', `<head>\n${CONSOLE_INTERCEPTOR}\n${styleTag}`);
+    html = html.replace('<head>', `<head>\n${libBlock}\n${foucFix}\n${CONSOLE_INTERCEPTOR}\n${styleTag}`);
   } else {
-    html = CONSOLE_INTERCEPTOR + styleTag + html;
+    html = libBlock + foucFix + CONSOLE_INTERCEPTOR + styleTag + html;
   }
 
   // Insert scripts before </body>
@@ -91,7 +94,9 @@ function buildHtmlDocument(files: FileNode[]): string {
   return html;
 }
 
-function buildReactDocument(code: string): string {
+function buildReactDocument(code: string, selectedLibraries: string[]): string {
+  const libBlock = buildLibraryInjections(selectedLibraries);
+  const foucFix = needsFoucFix(selectedLibraries) ? FOUC_FIX : '';
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -99,6 +104,8 @@ function buildReactDocument(code: string): string {
   <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  ${libBlock}
+  ${foucFix}
   ${CONSOLE_INTERCEPTOR}
   <style>
     body { margin: 0; font-family: sans-serif; background: white; }
@@ -119,12 +126,16 @@ function buildReactDocument(code: string): string {
 </html>`;
 }
 
-function buildVueDocument(code: string): string {
+function buildVueDocument(code: string, selectedLibraries: string[]): string {
+  const libBlock = buildLibraryInjections(selectedLibraries);
+  const foucFix = needsFoucFix(selectedLibraries) ? FOUC_FIX : '';
   return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  ${libBlock}
+  ${foucFix}
   ${CONSOLE_INTERCEPTOR}
   <style>
     body { margin: 0; font-family: sans-serif; background: white; }
@@ -144,12 +155,16 @@ function buildVueDocument(code: string): string {
 </html>`;
 }
 
-function buildAngularDocument(code: string): string {
+function buildAngularDocument(code: string, selectedLibraries: string[]): string {
+  const libBlock = buildLibraryInjections(selectedLibraries);
+  const foucFix = needsFoucFix(selectedLibraries) ? FOUC_FIX : '';
   return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
   <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.3/angular.min.js"></script>
+  ${libBlock}
+  ${foucFix}
   ${CONSOLE_INTERCEPTOR}
   <style>
     body { margin: 0; font-family: sans-serif; background: white; }
@@ -176,16 +191,17 @@ export function buildPreviewDocument(
   languageId: LanguageId,
   files: FileNode[],
   activeCode: string,
+  selectedLibraries: string[] = [],
 ): string {
   switch (languageId) {
     case 'html':
-      return buildHtmlDocument(files);
+      return buildHtmlDocument(files, selectedLibraries);
     case 'react':
-      return buildReactDocument(activeCode);
+      return buildReactDocument(activeCode, selectedLibraries);
     case 'vue':
-      return buildVueDocument(activeCode);
+      return buildVueDocument(activeCode, selectedLibraries);
     case 'angular':
-      return buildAngularDocument(activeCode);
+      return buildAngularDocument(activeCode, selectedLibraries);
     default:
       return '';
   }
@@ -205,6 +221,7 @@ interface PreviewPanelProps {
   onConsoleMessage: (msg: WebConsoleMessage) => void;
   onRefresh: () => void;
   refreshKey: number;
+  selectedLibraries: string[];
 }
 
 export default function PreviewPanel({
@@ -214,6 +231,7 @@ export default function PreviewPanel({
   onConsoleMessage,
   onRefresh,
   refreshKey,
+  selectedLibraries,
 }: PreviewPanelProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [srcdoc, setSrcdoc] = useState('');
@@ -225,19 +243,19 @@ export default function PreviewPanel({
     if (isFirstRender.current) {
       // Render immediately on first load — no waiting
       isFirstRender.current = false;
-      const doc = buildPreviewDocument(languageId, files, activeCode);
+      const doc = buildPreviewDocument(languageId, files, activeCode, selectedLibraries);
       setSrcdoc(doc);
       return;
     }
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      const doc = buildPreviewDocument(languageId, files, activeCode);
+      const doc = buildPreviewDocument(languageId, files, activeCode, selectedLibraries);
       setSrcdoc(doc);
     }, 500);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [files, activeCode, languageId, refreshKey]);
+  }, [files, activeCode, languageId, refreshKey, selectedLibraries]);
 
   // Listen for console messages from iframe
   useEffect(() => {
@@ -255,13 +273,12 @@ export default function PreviewPanel({
 
   // Open in new tab
   const openInNewTab = useCallback(() => {
-    const doc = buildPreviewDocument(languageId, files, activeCode);
+    const doc = buildPreviewDocument(languageId, files, activeCode, selectedLibraries);
     const blob = new Blob([doc], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     window.open(url, '_blank');
-    // Clean up after a delay
     setTimeout(() => URL.revokeObjectURL(url), 5000);
-  }, [languageId, files, activeCode]);
+  }, [languageId, files, activeCode, selectedLibraries]);
 
   return (
     <div className="h-full flex flex-col bg-white">

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Play, Loader2, ChevronDown, AlertTriangle, RefreshCw } from 'lucide-react';
 import { LanguageOption, LANGUAGES, LanguageId } from '@/types';
+import MarketplaceDropdown from '@/components/Toolbar/MarketplaceDropdown';
 
 interface EditorToolbarProps {
   language: LanguageOption;
@@ -12,9 +13,11 @@ interface EditorToolbarProps {
   activeFileName: string;
   isWebMode?: boolean;
   onRefresh?: () => void;
+  selectedLibraries?: string[];
+  onLibraryChange?: (ids: string[]) => void;
 }
 
-export default function EditorToolbar({ language, onLanguageChange, onRun, isRunning, activeFileName, isWebMode, onRefresh }: EditorToolbarProps) {
+export default function EditorToolbar({ language, onLanguageChange, onRun, isRunning, activeFileName, isWebMode, onRefresh, selectedLibraries, onLibraryChange }: EditorToolbarProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showSwitchModal, setShowSwitchModal] = useState(false);
   const [pendingLanguage, setPendingLanguage] = useState<LanguageId | null>(null);
@@ -96,8 +99,14 @@ export default function EditorToolbar({ language, onLanguageChange, onRun, isRun
           </span>
         </div>
 
-        {/* Right: Run or Refresh */}
+        {/* Right: Marketplace + Run or Refresh */}
         <div className="flex items-center gap-2">
+          {isWebMode && selectedLibraries && onLibraryChange && (
+            <MarketplaceDropdown
+              selectedLibraries={selectedLibraries}
+              onLibraryChange={onLibraryChange}
+            />
+          )}
           {isWebMode ? (
             <button
               onClick={() => onRefresh?.()}
